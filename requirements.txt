@@ -5,5 +5,5 @@ pandas
 numpy
 matplotlib
 requests
-sklearn
+scikit-learn
 plotly
