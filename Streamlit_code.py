@@ -74,108 +74,77 @@ def color(image):
 dat,transformer=load_props_data()
 st.title('City Sustainability')
 
-tab1, tab2, tab3 = st.tabs(["Home page", "Upload an image", "Choose a location"])
 
-with tab1:
-    with st.sidebar:
-        st.write('sidebar')
+uploaded_file = st.file_uploader('Upload a satellite image (png format)')
+center=st.text_input('Type city name or coordinates:')
+c1, c2 = st.columns(2)
 
-with tab2:
+#IMAGE WAS UPLOADED
+#----------------------#
+if uploaded_file is not None:
     
-    uploaded_file = st.file_uploader('Upload a satellite image (png format)')
-    if uploaded_file is not None:
-        st.image(uploaded_file)
-        image_path=script_path+'/test_data/'+uploaded_file.name
-        if st.button('Predict the mask'):
-            #image=tf.io.read_file(image_path)
-            
-            
-            #image=tf.io.decode_image(image, channels=3, expand_animations = False)
-            image=tf.io.decode_image(cv2.imdecode(np.frombuffer(uploaded_file.read()), 1), channels=3, expand_animations = False)
-            image=tf.image.resize(image, (256,256), method='bilinear')
-            image=tf.cast(image,dtype=tf.dtypes.uint8)
-            image_norm=image/255
+    image_path=script_path+'/test_data/'+uploaded_file.name
+    image=tf.io.read_file(image_path)
+    image=tf.io.decode_image(image, channels=3, expand_animations = False)
+    
+    image_viz=cv2.resize(cv2.imdecode(np.frombuffer(uploaded_file.read(), np.uint8), 1),(256,256))
+    image=tf.image.resize(image, (256,256), method='bilinear')
+    c1.image(image_viz,width=512,caption='Input image')
+    image=tf.cast(image,dtype=tf.dtypes.uint8)
+    image_norm=image/255
+#-----------------------#
 
-
-            model=loading_model()
-            st.balloons()
-            y_pred=model.predict(image_norm.numpy().reshape(1,256,256,3))
-            pred=color(np.argmax(y_pred.reshape(256,256,9),axis=2))
-
-            colors = ['#000000','#800000','#00FF24','#949494','#FFFFFF','#226126','#0045FF','#4BB549','#DE1F07']
-            labels=['Background','Bareland','Rangeland','Developed space','Road','Tree','Water','Agriculture land','Building']
-
-            unique, counts = np.unique(np.argmax(y_pred.reshape(256,256,9),axis=2), return_counts=True)
-            count={k: v for k, v in zip(unique, (counts/sum(counts))*100)}
-            for i in range(9):
-                count.setdefault(i,0)
-            count.update((x, (y/sum(counts))*100) for x, y in count.items())
-            count=dict(sorted(count.items()))
-
-            fig1, ax1 = plt.subplots()
-            patches, text= ax1.pie(count.values(), labels=count.keys(), startangle=90, counterclock=False, colors=colors)
-            ax1.legend(patches, labels, loc='best',bbox_to_anchor=(1, 1),fontsize=10)
-
-            c1, c2= st.columns(2)
-            c1.image(np.array(image),width=350)
-            c2.image(pred,width=350)
-            st.pyplot(fig1)
-            
-
-with tab3:
-    choice=st.radio("Search for a satellite image by:",options=["city name", "latitude/longitude"])
-    if choice == "city name":
-        center=st.text_input('Insert here the city you would like to analyze:')
-    else:
-        center=st.text_input('Insert here the latitude and longitude of the area of interest separated by a comma or a space:')
-
+#IMAGE PROVIDED VIA URL
+#-----------------------#
+else:
+    #choice=c1.radio("Search for a satellite image by:",options=["city name", "latitude/longitude"])
+    #center=c1.text_input('Type city name or coordinates:')
     url = "https://maps.googleapis.com/maps/api/staticmap?center="+center+"&zoom=17&size=512x512&maptype=satellite&key=AIzaSyACWoZYiDF8HRT6NST2pW9_yWf1ouIIBIw"
     r = requests.get(url)
     i = Image.open(BytesIO(r.content)).convert("RGB")
-    st.image(i)
-    if st.button('Predict your city`s mask'):
-            #image=tf.io.read_file(image_path)
-            #image=tf.io.decode_image(image, channels=3, expand_animations = False)
-            image=tf.image.resize(np.array(i), (256,256), method='bilinear')
-            image=tf.cast(image,dtype=tf.dtypes.uint8)
-            image_norm=image/255
+    c1.image(i,width=512,caption='Input image')
+    image=tf.image.resize(np.array(i), (256,256), method='bilinear')
+    image=tf.cast(image,dtype=tf.dtypes.uint8)
+    image_norm=image/255
+if c1.button('Analyze'):
+        model=loading_model()
+        st.balloons()
+        y_pred=model.predict(image_norm.numpy().reshape(1,256,256,3))
+        pred=color(np.argmax(y_pred.reshape(256,256,9),axis=2))
 
-            model=loading_model()
-            st.balloons()
-            y_pred=model.predict(image_norm.numpy().reshape(1,256,256,3))
-            pred=color(np.argmax(y_pred.reshape(256,256,9),axis=2))
+        colors = ['#000000','#800000','#00FF24','#949494','#FFFFFF','#226126','#0045FF','#4BB549','#DE1F07']
+        labels=['Background','Bareland','Rangeland','Developed space','Road','Tree','Water','Agriculture land','Building']
 
-            colors = ['#000000','#800000','#00FF24','#949494','#FFFFFF','#226126','#0045FF','#4BB549','#DE1F07']
-            labels=['Background','Bareland','Rangeland','Developed space','Road','Tree','Water','Agriculture land','Building']
+        unique, counts = np.unique(np.argmax(y_pred.reshape(256,256,9),axis=2), return_counts=True)
+        arcount=np.zeros(8)
+        for ind in range(len(unique)):
+            if unique[ind]!=0:
+                arcount[unique[ind]-1]=counts[ind]
+        arcount=arcount/np.sum(arcount)
+        
+        count={k: v for k, v in zip(unique, (counts/sum(counts))*100)}
+        for i in range(9):
+            count.setdefault(i,0)
+        count.update((x, (y/sum(counts))*100) for x, y in count.items())
+        count=dict(sorted(count.items()))
+        
+        tempdat=create_data_for_scatter(dat,transformer,arcount)
+        fig=px.scatter(tempdat,'C1','C2',color='nature',size='size',symbol='symbol',text='annotation',width=1000,height=900,color_continuous_scale='rainbow')
+        fig.update_traces(textposition='top center')
+        fig.update_layout(showlegend=False)
+        fig.update_yaxes(visible=False, showticklabels=False)
+        fig.update_xaxes(visible=False, showticklabels=False)
+        p_x=tempdat.loc[len(tempdat)-1,'C1']
+        p_y=tempdat.loc[len(tempdat)-1,'C2']
+        fig.add_annotation(x=-0.7, y=0.63,text="YOU ARE HERE!",showarrow=False)   
+        fig.add_annotation(ax=-0.7, ay=0.6,axref="x", ayref="y",x=p_x,y=p_y,showarrow=True,arrowsize=2,arrowhead=1,xanchor="right",yanchor="top")
+        st.plotly_chart(fig, use_container_width=True)
+        #fig1, ax1 = plt.subplots()
+        #patches, text= ax1.pie(count.values(), labels=count.keys(), startangle=90, counterclock=False, colors=colors)
+        #ax1.legend(patches, labels, loc='best',bbox_to_anchor=(1, 1),fontsize=10)
 
-            unique, counts = np.unique(np.argmax(y_pred.reshape(256,256,9),axis=2), return_counts=True)
-            arcount=np.zeros(8)
-            for ind in range(len(unique)):
-                if unique[ind]!=0:
-                    arcount[unique[ind]-1]=counts[ind]
-            arcount=arcount/np.sum(arcount)
-            
-            count={k: v for k, v in zip(unique, (counts/sum(counts))*100)}
-            for i in range(9):
-                count.setdefault(i,0)
-            count.update((x, (y/sum(counts))*100) for x, y in count.items())
-            count=dict(sorted(count.items()))
-            
-            tempdat=create_data_for_scatter(dat,transformer,arcount)
-            fig=px.scatter(tempdat,'C1','C2',color='nature',size='size',symbol='symbol',text='annotation',width=1000,height=900,color_continuous_scale='rainbow')
-            fig.update_traces(textposition='top center')
-            fig.update_layout(showlegend=False)
-            p_x=tempdat.loc[len(tempdat)-1,'C1']
-            p_y=tempdat.loc[len(tempdat)-1,'C2']
-            fig.add_annotation(x=-0.7, y=0.63,text="YOU ARE HERE!",showarrow=False)   
-            fig.add_annotation(ax=-0.7, ay=0.6,axref="x", ayref="y",x=p_x,y=p_y,showarrow=True,arrowsize=2,arrowhead=1,xanchor="right",yanchor="top")
-            st.plotly_chart(fig, use_container_width=True)
-            #fig1, ax1 = plt.subplots()
-            #patches, text= ax1.pie(count.values(), labels=count.keys(), startangle=90, counterclock=False, colors=colors)
-            #ax1.legend(patches, labels, loc='best',bbox_to_anchor=(1, 1),fontsize=10)
-
-            c1, c2= st.columns(2)
-            c1.image(np.array(image),width=350)
-            c2.image(pred,width=350)
-            st.pyplot(fig1)
+        
+        #c1.image(np.array(image),width=350)
+        c2.image(pred,width=512,caption='Land type prediction')
+        st.pyplot(fig1)
             
