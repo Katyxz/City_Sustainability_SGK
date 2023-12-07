@@ -11,15 +11,23 @@ import sklearn
 import sklearn.manifold
 import cv2
 import plotly.express as px
+import torch
+import urllib.request
 st.set_page_config(layout="wide")
 script_path = os.path.dirname(os.path.abspath(__file__))
 @st.cache_resource
 def loading_model():
-    return tf.keras.saving.load_model(script_path+'/model/model_vgg16_shuffle_edit_weights_2.hdf5')
+    model_path='model.hdf5'
+    url="https://storage.googleapis.com/city_sustainability_raw_data/model_vgg16_shuffle_edit_weights_2.hdf5"
+    urllib.request.urlretrieve(url, model_path)
+    model = tf.keras.models.load_model(model_path)
+    return model
+    #return tf.keras.saving.load_model(script_path+'/model/model_vgg16_shuffle_edit_weights_2.hdf5')
 model=loading_model()
 @st.cache_data
 def load_props_data():
-    dat=pd.read_csv('D:/CSLWB/data for app/all_props_grouped_and_with_transform.csv')
+    #dat=pd.read_csv('D:/CSLWB/data for app/all_props_grouped_and_with_transform.csv')
+    dat=pd.read_csv(script_path+'/data/all_props_grouped_and_with_transform.csv')
     propcols=[t for t in dat.columns if 'prop_' in t]
     transformer = sklearn.manifold.Isomap(n_components=2)
     X_transformed = transformer.fit_transform(dat[propcols][dat['is_region']==1])
@@ -30,8 +38,15 @@ def load_props_data():
     dat.loc[dat['is_region']==0,'C2']=grouped[:,1]
     dat['annotation']=dat['annotation'].fillna(' ')
     dat['symbol']=0
+    dat['urban']=dat['prop_1']+dat['prop_3']+dat['prop_4']+dat['prop_8']
+    dat['developed']=dat['prop_3']+dat['prop_4']+dat['prop_8']+dat['prop_7']
+    dat['nature']=dat['prop_2']+dat['prop_5']+dat['prop_6']
+    a=dat['urban'].values
+    b=dat['nature'].values
+    c=dat['prop_7'].values
+    dat['sustainability index']=1-np.sqrt((a-0.5)*(a-0.5)+(b-0.5)*(b-0.5)+(c-0.3)*(c-0.3))
     return dat,transformer
-    
+
 def create_data_for_scatter(dat,transformer,newvals):
     new_data=pd.DataFrame(columns=dat.columns)
     propcols=[t for t in dat.columns if 'prop_' in t]
@@ -52,8 +67,15 @@ def create_data_for_scatter(dat,transformer,newvals):
     tempdat=pd.concat([dat,new_data],ignore_index=True)
     tempdat.loc[len(tempdat)-1,'symbol']=17
     tempdat.loc[len(tempdat)-1,'annotation']='YOU ARE HERE!!!'
+    tempdat['urban']=tempdat['prop_1']+tempdat['prop_3']+tempdat['prop_4']+tempdat['prop_8']
+    tempdat['developed']=tempdat['prop_3']+tempdat['prop_4']+tempdat['prop_8']+tempdat['prop_7']
+    tempdat['nature']=tempdat['prop_2']+tempdat['prop_5']+tempdat['prop_6']
+    a=tempdat['urban'].values
+    b=tempdat['nature'].values
+    c=tempdat['prop_7'].values
+    tempdat['sustainability index']=1-np.sqrt((a-0.5)*(a-0.5)+(b-0.5)*(b-0.5)+(c-0.3)*(c-0.3))
     return tempdat
-    
+
 def color(image):
     color_map = {0: np.array([0, 0, 0]),
              1: np.array([128, 0, 0]),
@@ -72,24 +94,41 @@ def color(image):
     return data_3d
 
 dat,transformer=load_props_data()
-st.title('City Sustainability')
+st.title('CHROMA SGK')
+st.header('Your City Sustainability App')
 
 
 uploaded_file = st.file_uploader('Upload a satellite image (png format)')
 center=st.text_input('Type city name or coordinates:')
-c1, c2 = st.columns(2)
+c1, c2, c3 = st.columns(3)
 
 #IMAGE WAS UPLOADED
 #----------------------#
 if uploaded_file is not None:
-    
-    image_path=script_path+'/test_data/'+uploaded_file.name
-    image=tf.io.read_file(image_path)
-    image=tf.io.decode_image(image, channels=3, expand_animations = False)
-    
-    image_viz=cv2.resize(cv2.imdecode(np.frombuffer(uploaded_file.read(), np.uint8), 1),(256,256))
-    image=tf.image.resize(image, (256,256), method='bilinear')
+
+    #image_path=script_path+'/test_data/'+uploaded_file.name
+    #image=tf.io.read_file(image_path)
+    #image=tf.io.decode_image(image, channels=3, expand_animations = False)
+    #image_viz=cv2.resize(cv2.imdecode(np.frombuffer(uploaded_file.read(), np.uint8), 1),(256,256))
+    #input_image=cv2.resize(cv2.imdecode(np.frombuffer(uploaded_file.read(), np.uint8), 1),(256,256))
+    #input_image=tf.image.resize(input_image, (256,256), method='bilinear')
+
+    #c1.image(uploaded_file,width=500,caption='Input image')
+
+    #image_path=script_path+'/test_data/'+uploaded_file.name
+    #image=tf.io.read_file(image_path)
+    #image=tf.io.decode_image(image, channels=3, expand_animations = False)
+    image = cv2.imdecode(np.frombuffer(uploaded_file.read(), np.uint8), 1)
+    #image_viz=cv2.resize(cv2.imdecode(np.frombuffer(uploaded_file.read(), np.uint8), 1),(256,256))
+    #image=tf.image.resize(image, (256,256), method='bilinear')
+    image_viz=cv2.resize(image, (256,256))
+    image_viz=image_viz[:, :, ::-1].copy()
     c1.image(image_viz,width=512,caption='Input image')
+
+    #image = cv2.imdecode(np.frombuffer(uploaded_file.read(), np.uint8), 1)
+    image=image[:, :, ::-1].copy()
+    image = torch.tensor(image)
+    image=tf.image.resize(image, (256,256), method='bilinear')
     image=tf.cast(image,dtype=tf.dtypes.uint8)
     image_norm=image/255
 #-----------------------#
@@ -106,11 +145,13 @@ else:
     image=tf.image.resize(np.array(i), (256,256), method='bilinear')
     image=tf.cast(image,dtype=tf.dtypes.uint8)
     image_norm=image/255
+
 if c1.button('Analyze'):
         model=loading_model()
         st.balloons()
         y_pred=model.predict(image_norm.numpy().reshape(1,256,256,3))
         pred=color(np.argmax(y_pred.reshape(256,256,9),axis=2))
+        c2.image(pred,width=512,caption='Land type prediction')
 
         colors = ['#000000','#800000','#00FF24','#949494','#FFFFFF','#226126','#0045FF','#4BB549','#DE1F07']
         labels=['Background','Bareland','Rangeland','Developed space','Road','Tree','Water','Agriculture land','Building']
@@ -121,30 +162,30 @@ if c1.button('Analyze'):
             if unique[ind]!=0:
                 arcount[unique[ind]-1]=counts[ind]
         arcount=arcount/np.sum(arcount)
-        
+
         count={k: v for k, v in zip(unique, (counts/sum(counts))*100)}
         for i in range(9):
             count.setdefault(i,0)
         count.update((x, (y/sum(counts))*100) for x, y in count.items())
         count=dict(sorted(count.items()))
-        
+        fig1, ax1 = plt.subplots()
+        autopct = lambda v: f'{v:.2f}%' if v > 5 else None
+        patches,text = plt.pie(count.values(), startangle=90, counterclock=False, colors=colors)
+        plt.pie(count.values(), autopct=autopct, startangle=90, counterclock=False, colors=colors)
+        ax1.legend(patches, labels, loc='best',bbox_to_anchor=(1, 1),fontsize=10)
+
+
         tempdat=create_data_for_scatter(dat,transformer,arcount)
-        fig=px.scatter(tempdat,'C1','C2',color='nature',size='size',symbol='symbol',text='annotation',width=1000,height=900,color_continuous_scale='rainbow')
+        fig=px.scatter(tempdat,'C1','C2',color='sustainability index',size='size',symbol='symbol',text='annotation',width=1000,height=900,color_continuous_scale='rainbow')
         fig.update_traces(textposition='top center')
         fig.update_layout(showlegend=False)
         fig.update_yaxes(visible=False, showticklabels=False)
         fig.update_xaxes(visible=False, showticklabels=False)
         p_x=tempdat.loc[len(tempdat)-1,'C1']
         p_y=tempdat.loc[len(tempdat)-1,'C2']
-        fig.add_annotation(x=-0.7, y=0.63,text="YOU ARE HERE!",showarrow=False)   
+        fig.add_annotation(x=-0.7, y=0.63,text="YOU ARE HERE!",showarrow=False)
         fig.add_annotation(ax=-0.7, ay=0.6,axref="x", ayref="y",x=p_x,y=p_y,showarrow=True,arrowsize=2,arrowhead=1,xanchor="right",yanchor="top")
         st.plotly_chart(fig, use_container_width=True)
-        #fig1, ax1 = plt.subplots()
-        #patches, text= ax1.pie(count.values(), labels=count.keys(), startangle=90, counterclock=False, colors=colors)
-        #ax1.legend(patches, labels, loc='best',bbox_to_anchor=(1, 1),fontsize=10)
-
-        
+        c3.text('City sustainability index is '+str(round(tempdat.loc[len(tempdat)-1,'sustainability index'],2)*100)+'%')
+        c3.pyplot(fig1,use_container_width=True)
         #c1.image(np.array(image),width=350)
-        c2.image(pred,width=512,caption='Land type prediction')
-        st.pyplot(fig1)
-            
