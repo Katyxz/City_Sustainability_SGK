@@ -58,7 +58,7 @@ def create_data_for_scatter(dat,transformer,newvals):
     new_data['nature']=new_data['prop_1']+new_data['prop_2']+new_data['prop_5']+new_data['prop_6']
     new_data['is_region']=0
     new_data['annotation']=' '
-    new_data['size']=20
+    new_data['size']=10
     new_data['city']=' '
     new_data['name']=' '
     new_data['color']=10
@@ -67,14 +67,15 @@ def create_data_for_scatter(dat,transformer,newvals):
     new_data.loc[:,'C2']=new_tr[:,1]
     tempdat=pd.concat([dat,new_data],ignore_index=True)
     tempdat.loc[len(tempdat)-1,'symbol']=17
-    tempdat.loc[len(tempdat)-1,'annotation']='YOU ARE HERE!!!'
+    tempdat.loc[len(tempdat)-1,'annotation']=' '
     tempdat['urban']=tempdat['prop_1']+tempdat['prop_3']+tempdat['prop_4']+tempdat['prop_8']
     tempdat['developed']=tempdat['prop_3']+tempdat['prop_4']+tempdat['prop_8']+tempdat['prop_7']
     tempdat['nature']=tempdat['prop_2']+tempdat['prop_5']+tempdat['prop_6']
     a=tempdat['urban'].values
     b=tempdat['nature'].values
     c=tempdat['prop_7'].values
-    tempdat['sustainability index']=1-np.sqrt((a-0.5)*(a-0.5)+(b-0.5)*(b-0.5)+(c-0.3)*(c-0.3))
+    tempdat['sustainability index']=1-np.sqrt((a-0.5)*(a-0.5)+(b-0.65)*(b-0.65)+(c-0.3)*(c-0.3))
+    tempdat['sustainability index']=(tempdat['sustainability index']-tempdat['sustainability index'].min())/(tempdat['sustainability index'].max()-tempdat['sustainability index'].min())
     return tempdat
 
 def color(image):
@@ -95,8 +96,9 @@ def color(image):
     return data_3d
 
 dat,transformer=load_props_data()
-st.title('CHROMA SGK')
-st.header('Your City Sustainability App')
+st.image('logo.png')
+st.header('City Sustainability App')
+st.markdown("***")
 
 
 uploaded_file = st.file_uploader('Upload a satellite image (png format)')
@@ -177,15 +179,21 @@ if c1.button('Analyze'):
 
 
         tempdat=create_data_for_scatter(dat,transformer,arcount)
-        fig=px.scatter(tempdat,'C1','C2',color='sustainability index',size='size',symbol='symbol',text='annotation',width=1000,height=900,color_continuous_scale='rainbow')
+        fig=px.scatter(tempdat,'C1','C2',color='sustainability index',size='size',symbol='symbol',text='annotation',width=1000,height=1100,color_continuous_scale=[(0, "red"),(0.1,'red'), (0.5, "yellow"), (1, "green")])
         fig.update_traces(textposition='top center')
         fig.update_layout(showlegend=False)
         fig.update_yaxes(visible=False, showticklabels=False)
         fig.update_xaxes(visible=False, showticklabels=False)
         p_x=tempdat.loc[len(tempdat)-1,'C1']
         p_y=tempdat.loc[len(tempdat)-1,'C2']
-        fig.add_annotation(x=-0.7, y=0.63,text="YOU ARE HERE!",showarrow=False)
-        fig.add_annotation(ax=-0.7, ay=0.6,axref="x", ayref="y",x=p_x,y=p_y,showarrow=True,arrowsize=2,arrowhead=1,xanchor="right",yanchor="top")
+        fig.add_annotation(x=0.6, y=0.75,text="Forests",showarrow=False,font=dict(size=20, color="black"))
+        fig.add_annotation(x=0.0, y=0.8,text="Rangeland",showarrow=False,font=dict(size=20, color="black"))
+        fig.add_annotation(x=1, y=-0.75,text="Agriculture",showarrow=False,font=dict(size=20, color="black"))
+        fig.add_annotation(x=-0.55, y=-0.7,text="Urban development",showarrow=False,font=dict(size=20, color="black"))
+        fig.add_annotation(x=-0.9, y=-0.2,text="Residential",showarrow=False,font=dict(size=20, color="black"))
+        fig.add_annotation(x=-0.6, y=0.75,text="Water reservoirs",showarrow=False,font=dict(size=20, color="black"))
+        fig.add_annotation(x=-0.8, y=0.45,text="You are here",showarrow=False,font=dict(size=20, color="black"))
+        fig.add_annotation(ax=-0.8, ay=0.43,axref="x", ayref="y",x=p_x,y=p_y,showarrow=True,arrowsize=2,arrowhead=1,xanchor="right",yanchor="top")
         st.plotly_chart(fig, use_container_width=True)
         c3.header('City sustainability index is '+str(round(tempdat.loc[len(tempdat)-1,'sustainability index'],2)*100)+'%')
         c3.pyplot(fig1,use_container_width=True)
