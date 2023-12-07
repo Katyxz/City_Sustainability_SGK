@@ -27,7 +27,8 @@ model=loading_model()
 @st.cache_data
 def load_props_data():
     #dat=pd.read_csv('D:/CSLWB/data for app/all_props_grouped_and_with_transform.csv')
-    dat=pd.read_csv(script_path+'/data/all_props_grouped_and_with_transform.csv')
+    #dat=pd.read_csv(script_path+'/data/all_props_grouped_and_with_transform.csv')
+    dat=pd.read_csv('all_props_grouped_and_with_transform.csv')
     propcols=[t for t in dat.columns if 'prop_' in t]
     transformer = sklearn.manifold.Isomap(n_components=2)
     X_transformed = transformer.fit_transform(dat[propcols][dat['is_region']==1])
@@ -186,6 +187,6 @@ if c1.button('Analyze'):
         fig.add_annotation(x=-0.7, y=0.63,text="YOU ARE HERE!",showarrow=False)
         fig.add_annotation(ax=-0.7, ay=0.6,axref="x", ayref="y",x=p_x,y=p_y,showarrow=True,arrowsize=2,arrowhead=1,xanchor="right",yanchor="top")
         st.plotly_chart(fig, use_container_width=True)
-        c3.text('City sustainability index is '+str(round(tempdat.loc[len(tempdat)-1,'sustainability index'],2)*100)+'%')
+        c3.header('City sustainability index is '+str(round(tempdat.loc[len(tempdat)-1,'sustainability index'],2)*100)+'%')
         c3.pyplot(fig1,use_container_width=True)
         #c1.image(np.array(image),width=350)
